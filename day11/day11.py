@@ -23,36 +23,36 @@ def get_adjacent_idx(idx, shape):
     return valid_pos
 
 
-def simulate_step(grid):
-
-    num_flashes = 0
-
-    reset_locs = []
-
+def flash_grid(grid):
     flash_locs = np.where(grid >= 9)
     flash_locs = list(zip(flash_locs[0], flash_locs[1]))
-    curr_flashes = len(flash_locs)
-    while(curr_flashes > 0):
-        num_flashes += curr_flashes
+    num_flashes = len(flash_locs)
 
-        reset_locs.append(flash_locs)
-        for loc in flash_locs:
+    for loc in flash_locs:
             adj_idx = get_adjacent_idx(loc, grid.shape)
             for idx in adj_idx:
                 grid[idx[0], idx[1]] += 1
-        for loc in flash_locs:
-            grid[loc] = 0
+    for loc in flash_locs:
+        grid[loc] = 0
 
-        flash_locs = np.where(grid >= 9)
-        flash_locs = list(zip(flash_locs[0], flash_locs[1]))
-        curr_flashes = len(flash_locs)
+    return grid, num_flashes, flash_locs
 
-    grid = grid + 1
-    for tmp in reset_locs:
-        for loc in tmp:
-            grid[loc] = 0
+def simulate_step(grid):
+    num_flashes = 0
+    reset_locs = []
+    while np.where(grid >= 9)[0].size:
+        grid, curr_flashes, flash_locs = flash_grid(grid)
+        num_flashes += curr_flashes
+        reset_locs.append(flash_locs)
+
+    grid += 1
+
+    reset_locs = [loc for tmp_locs in reset_locs for loc in tmp_locs]
+    for loc in reset_locs:
+        grid[loc] = 0
 
     return grid, num_flashes
+
 
 def simulate_fixed_steps(max_steps, grid):
     total_flashes = 0
@@ -76,8 +76,8 @@ def find_sync_step(grid):
 def main():
     fname = sys.argv[1]
     grid = parse_input(fname)
-
     simulate_fixed_steps(max_steps=100, grid=grid)
+    grid = parse_input(fname)
     find_sync_step(grid)
     
 
