@@ -64,13 +64,36 @@ def find_paths_bfs(graph):
 
     return final_paths
 
+def find_paths_dfs(graph):
+    curr_node = 'start'
+    path = []
+    visited = []
+    paths = []
+    find_paths_dfs_helper(curr_node, path, visited, paths, graph)
+
+    return paths
+
+def find_paths_dfs_helper(node, path, visited, paths, graph):
+    if node in visited:
+        return
+    path.append(node)
+    visited.append(node)
+    if node == 'end':
+        paths.append(path)
+    
+    for adjNode in graph[node]:
+        find_paths_dfs_helper(adjNode, path, visited, paths, graph)
+        path.pop()
+        visited.pop()
+        
+
 
 def main():
     fname = sys.argv[1]
     graph = parse_input(fname)
     print(graph)
 
-    paths = find_paths_bfs(graph)
+    paths = find_paths_dfs(graph)
     for path in paths:
         print('-'.join(path))
     print(f"Total paths: {len(paths)}")
