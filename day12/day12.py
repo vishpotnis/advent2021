@@ -67,24 +67,27 @@ def find_paths_bfs(graph):
 def find_paths_dfs(graph):
     curr_node = 'start'
     path = []
-    visited = []
+    visited = set()
     paths = []
     find_paths_dfs_helper(curr_node, path, visited, paths, graph)
 
     return paths
 
 def find_paths_dfs_helper(node, path, visited, paths, graph):
-    if node in visited:
-        return
-    path.append(node)
-    visited.append(node)
+    path.append(node)       
+    if node.islower():
+        visited.add(node)
     if node == 'end':
-        paths.append(path)
+        paths.append(path.copy())
+        return
+    
     
     for adjNode in graph[node]:
-        find_paths_dfs_helper(adjNode, path, visited, paths, graph)
-        path.pop()
-        visited.pop()
+        if adjNode not in visited:
+            find_paths_dfs_helper(adjNode, path, visited, paths, graph)
+            path.pop()
+            if adjNode in visited:
+                visited.remove(adjNode)
         
 
 
