@@ -10,7 +10,6 @@ class PacketParserType(Enum):
     LENGTH = 2
     TAKE_UNTIL = 3
 
-
 class Packet():
     def __init__(self, pkt_type : PacketType, parsed_pkt):
         self.pkt_type = pkt_type
@@ -50,14 +49,12 @@ class Packet():
         
         text += header + pkt_txt + '\n'
         for subpkt in self.subpkts:
-            text += subpkt.get_string_rep(indent_lvl + 1)            
+            text += subpkt.get_string_rep(indent_lvl + 1)
         return text
-
 
     def __str__(self):
         return self.get_string_rep(0)
         
-
 
 
 class PacketParser():
@@ -75,103 +72,99 @@ class PacketParser():
         self.num_bits_read = 0
         self.num_pkts_parsed = 0
 
+    def parse_num_bits(self, num_bits, advance_idx=False):
+        val = int(self.text[self.idx : self.idx + num_bits], 2)
+        if advance_idx:
+            self.idx += num_bits
+            self.num_bits_read += num_bits
+        return val
+
+    def parse_packet_header(self, advance_idx=False):
+        version = self.parse_num_bits(3, advance_idx=True)
+        id = self.parse_num_bits(3, advance_idx)
+        if not advance_idx:
+            self.idx -= 3
+        return version, id
+
     def parse_literal_packet(self):
         version, id = self.parse_packet_header(advance_idx=True)
-        
+
         literal_val = []
-        done = False        
-        while not done:
-            literal_text = self.text[self.idx : self.idx + 5]
-            if literal_text[0] == '0':
-                done = True
-            literal_val.append(int(self.text[self.idx + 1 : self.idx + 5], 2))
-            self.idx += 5
-            self.num_bits_read += 5
+        continue_flag = True
+        while continue_flag:
+            continue_flag = self.parse_num_bits(1, advance_idx=True)
+            val = self.parse_num_bits(4, advance_idx=True)
+            literal_val.append(val)
         return (version, id, literal_val)
         
     def parse_operator_packet(self):
         version, id = self.parse_packet_header(advance_idx=True)
-        length_id = int(self.text[self.idx], 2)
-        self.idx += 1
-        self.num_bits_read += 1
+        length_id = self.parse_num_bits(1, advance_idx=True)
 
         if length_id == 0:
-            total_length = int(self.text[self.idx : self.idx + 15], 2)
-            self.idx += 15
-            self.num_bits_read += 15
+            total_length = self.parse_num_bits(15, advance_idx=True)
             return (version, id, length_id, total_length)
         elif length_id == 1:
-            num_subpkts = int(self.text[self.idx : self.idx + 11], 2)
-            self.idx += 11
-            self.num_bits_read += 11
+            num_subpkts = self.parse_num_bits(11, advance_idx=True)
             return (version, id, length_id, num_subpkts)
-            
-
-    def parse_packet_header(self, advance_idx=False):
-        version = int(self.text[self.idx : self.idx + 3],2)
-        id = int(self.text[self.idx + 3: self.idx + 6],2)
-        if advance_idx:
-            self.idx += 6
-            self.num_bits_read += 6
-        return version, id
-
 
     def parse(self):
         if self.parser_type == PacketParserType.TAKE_UNTIL:
-            return self.parse_take_until()
+            return self.parse_type_take_until()
         elif self.parser_type == PacketParserType.LENGTH:
-            return self.parse_num_bits()
+            return self.parse_type_num_bits()
         elif self.parser_type == PacketParserType.NUM_PACKETS:
-            return self.parse_num_packets()
+            return self.parse_type_num_packets()
 
-    def parse_block(self):
+    def parse_pkt(self):
         version, id = self.parse_packet_header(advance_idx=False)
         if id == 4:
             parsed_pkt = self.parse_literal_packet()
             pkt = Packet(PacketType.LITERAL, parsed_pkt)
         else:
             parsed_pkt = self.parse_operator_packet()
-            length_id = parsed_pkt[2]
             pkt = Packet(PacketType.OPERATOR, parsed_pkt)
-            if length_id == 0:
-                parser = PacketParser(self.text, PacketParserType.LENGTH, idx=self.idx, num_length=parsed_pkt[3])
-            elif length_id == 1:
-                parser = PacketParser(self.text, PacketParserType.NUM_PACKETS, idx=self.idx, num_pkts=parsed_pkt[3])
-            parsed_subpkts, new_idx = parser.parse()
-            self.num_bits_read += new_idx - self.idx
-            self.idx = new_idx
-            pkt.subpkts.extend(parsed_subpkts)
+            self.parse_subpkt(pkt)
 
         self.pkts.append(pkt)
         self.num_pkts_parsed += 1
         PacketParser.all_pkts.append(pkt)
 
+    def parse_subpkt(self, pkt):
+        if pkt.length_id == 0:
+            parser = PacketParser(self.text, PacketParserType.LENGTH, idx=self.idx, num_length=pkt.total_length)
+        elif pkt.length_id == 1:
+            parser = PacketParser(self.text, PacketParserType.NUM_PACKETS, idx=self.idx, num_pkts=pkt.num_subpkts)
+        parsed_subpkts, new_idx, subpkt_bits_read = parser.parse()
+        self.num_bits_read += subpkt_bits_read
+        self.idx = new_idx
+        pkt.subpkts.extend(parsed_subpkts)
 
 
-    def parse_take_until(self):
-        while int(self.text[self.idx:], 2) != 0:        
-            self.parse_block()
-        return self.pkts, self.idx
-    
-    def parse_num_bits(self):
+    def parse_type_take_until(self):
+        while int(self.text[self.idx:], 2) != 0:
+            self.parse_pkt()
+        return self.pkts, self.idx, self.num_bits_read
+
+    def parse_type_num_bits(self):
         while self.num_bits_read < self.num_length:
-            self.parse_block()
-        return self.pkts, self.idx
+            self.parse_pkt()
+        return self.pkts, self.idx, self.num_bits_read
 
-    def parse_num_packets(self):
+    def parse_type_num_packets(self):
         while self.num_pkts_parsed < self.num_pkts:
-            self.parse_block()
-        return self.pkts, self.idx
+            self.parse_pkt()
+        return self.pkts, self.idx, self.num_bits_read
 
 
 def parse_input(fname):
     with open(fname) as file:
-        text = file.readline()    
+        text = file.readline()
     return parse_input_from_str(text)
 
 def parse_input_from_str(text):
     bin_str = bin(int(text,16))[2:].zfill(len(text)*4)
-    return bin_str    
+    return bin_str
 
 def get_version_sum(pkts):
     sum = 0
@@ -188,7 +181,7 @@ def main():
     # bin_str = parse_input_from_str(istrs[6])
 
     parser = PacketParser(bin_str)
-    parsed_pkts, num_bits_parsed = parser.parse()    
+    parsed_pkts, _, _ = parser.parse()
 
     for pkt in parsed_pkts:
         print(pkt)
