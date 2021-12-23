@@ -137,11 +137,9 @@ class PacketParser():
         return val
 
     def parse_packet_header(self, advance_idx=False):
-        version = self.parse_num_bits(3, advance_idx=True)
-        id = self.parse_num_bits(3, advance_idx)
-        if not advance_idx:
-            self.idx -= 3
-            self.num_bits_read -= 3
+        packed_header = self.parse_num_bits(6, advance_idx)
+        version = packed_header // 8
+        id = packed_header % 8
         return version, id
 
     def parse_literal_packet(self):
