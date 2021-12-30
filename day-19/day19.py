@@ -1,4 +1,5 @@
 import sys
+from typing import Tuple
 import numpy as np
 import numpy.typing as npt
 import itertools
@@ -23,12 +24,12 @@ class Scanner:
         self.distances = [[get_distance(b1, b2) for b2 in self.beacons] for b1 in self.beacons]
 
 
-    def get_overlapping_beacons(s1:'Scanner', s2:'Scanner'):
+    def get_overlapping_beacons(s1:'Scanner', s2:'Scanner') -> list[Tuple[Beacon, Beacon]]:
         itr = itertools.product(range(s1.num_beacons), range(s2.num_beacons))
         overlapping_beacons = [ (s1.beacons[b1_idx], s2.beacons[b2_idx]) for b1_idx, b2_idx in itr if len(set(s1.distances[b1_idx]) & set(s2.distances[b2_idx])) >= 12]
         return overlapping_beacons
 
-    def adjust_scanner_offset(self, overlapping_beacons):
+    def adjust_scanner_offset(self, overlapping_beacons:list[Tuple[Beacon, Beacon]]):
         if not self.fixed:
             for mat in rot_mat:
                 adj_loc = [b1-mat.dot(b2) for b1, b2 in overlapping_beacons]
@@ -47,7 +48,7 @@ def get_distance(b1:Beacon, b2:Beacon) -> float:
     return np.sqrt(np.sum((b1 - b2) ** 2))
 
 
-def get_manhattan_distance(b1:Beacon, b2:Beacon) -> float:
+def get_manhattan_distance(b1:Beacon, b2:Beacon) -> int:
     return np.sum(np.abs(b1-b2))
 
 
@@ -68,7 +69,7 @@ def compute_scanner_orientations(scanners:list[Scanner]):
                 if i not in scanner_idx_q:
                     scanner_idx_q.append(i)
 
-def get_unique_beacons(scanners:list[Scanner]):
+def get_unique_beacons(scanners:list[Scanner]) -> list[Beacon]:
     beacons = []
     for scanner in scanners:
         for beacon in scanner.beacons:
@@ -76,11 +77,11 @@ def get_unique_beacons(scanners:list[Scanner]):
                 beacons.append(beacon)
     return beacons
 
-def get_max_manhattan_distance(scanners:list[Scanner]):
+def get_max_manhattan_distance(scanners:list[Scanner]) -> int:
     dist = [get_manhattan_distance(s1.offset, s2.offset) for s1, s2 in itertools.product(scanners, scanners)]
     return max(dist)
 
-def parse_input(fname):
+def parse_input(fname:str) -> list[Scanner]:
     scanners = []
     beacons = []
     with open(fname) as file:
