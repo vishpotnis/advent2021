@@ -28,20 +28,17 @@ class Scanner:
         overlapping_beacons = [ (s1.beacons[b1_idx], s2.beacons[b2_idx]) for b1_idx, b2_idx in itr if len(set(s1.distances[b1_idx]) & set(s2.distances[b2_idx])) >= 12]
         return overlapping_beacons
 
-    def compute_scanner_offset(self, overlapping_beacons):
-        for mat in rot_mat:
-            adj_loc = [b1-mat.dot(b2) for b1, b2 in overlapping_beacons]
-            if np.all(adj_loc[0] == adj_loc[1]):
-                if not self.fixed:
-                    print(f"adjusting position of scanner {self.id}")
-                    print(f"\t{self.offset}", end="")
+    def adjust_scanner_offset(self, overlapping_beacons):
+        if not self.fixed:
+            for mat in rot_mat:
+                adj_loc = [b1-mat.dot(b2) for b1, b2 in overlapping_beacons]
+                if np.all(adj_loc[0] == adj_loc[1]):
                     self.rot_mat = mat
                     self.offset = adj_loc[0]
-                    self.fixed = True
-                    print(f" -> {self.offset}")
-                return mat, adj_loc[0]
+                    self.adjust_beacon_locations()
 
     def adjust_beacon_locations(self):
+        self.fixed = True
         for i, beacon in enumerate(self.beacons):
             self.beacons[i] = self.rot_mat.dot(beacon) + self.offset
 
@@ -67,8 +64,7 @@ def compute_scanner_orientations(scanners:list[Scanner]):
             overlapping_beacons = Scanner.get_overlapping_beacons(scanners[curr_idx], scanners[i])
             if overlapping_beacons:
                 print(f"Found overlap between Scanner {curr_idx} and Scanner {i}")
-                mat, offset = scanners[i].compute_scanner_offset(overlapping_beacons)
-                scanners[i].adjust_beacon_locations()
+                scanners[i].adjust_scanner_offset(overlapping_beacons)
                 if i not in scanner_idx_q:
                     scanner_idx_q.append(i)
 
@@ -111,9 +107,6 @@ def main():
 
     unique_beacons = get_unique_beacons(scanners)
     print(f"{len(unique_beacons)} unique beacons")
-
-    for i, scanner in enumerate(scanners):
-        print(f"scanner {i}: {scanner.offset}")
 
     max_man_dist = get_max_manhattan_distance(scanners)
     print(f"Max Manhattan distance of scanners: {max_man_dist}")
